@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import httplib, urllib, base64, json
+from enum import Enum
 
 # 参考返回格式(无CID)
 # {
@@ -14,6 +15,10 @@ import httplib, urllib, base64, json
 # "entities" :
 # [{ "logprob":-19.704, "Id":2165751040, "Ti":"simulation based game learning environments building and sustaining a fish tank", "RId":[1994701398, 1676365973, 2035061933, 314405074, 2151715145, 2119649150, 2110893343, 1964392774, 1534728038, 2106969952], "AA":[{"AuId":2278995570}, {"AuId":2098746329}], "F":[{"FId":42525527}, {"FId":97812054}, {"FId":183322885}, {"FId":66024118}, {"FId":108583219}, {"FId":500300565}, {"FId":19417346}, {"FId":119857082}, {"FId":41008148}], "C":{"CId":1121720292} }]
 # }
+
+request_data = {} # 多线程send_request的返回值
+hostname = 'oxfordhk.azure-api.net'
+Mode = Enum("Mode", ("default", "id", "auid"))
 
 def Id_Info(conn, Id):
     Id = 'Id=' + Id +'&'
@@ -112,21 +117,71 @@ def AFId2AuId(conn, AfId):
             if item.has_key('AfId') and str(item['AfId']) == AfId:  # 简直智障, 我用AfId查还能查出这个字段没东西的paper
                 AuId = item['AuId']
                 AuIds = AuIds if AuId in AuIds else AuIds + [AuId]
-    print len(AuIds)
+    # print len(AuIds)
     return AuIds
 
+def send_request(expr):
+    global request_data
+    if expr == "empty":
+        request_data[expr] = []
+        return
+    conn = httplib.HTTPSConnection(hostname)
+    count = '&count=100000000&'
+    attributes = 'attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
+    key = 'subscription-key=f7cc29509a8443c5b3a5e56b0e38b5a6'
+    # print expr
+    print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
+    conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    response = conn.getresponse()
+    data = json.loads(response.read())['entities']
+    request_data[expr] = data
+
+def get_exprs(ids, mode):
+    exprs = []
+    if mode == Mode.id:
+        if(len(ids) >= 1):
+            expr = "Id=" + str(ids[0])
+            for id in ids[1:]:
+                if expr <= 1700: # 长度具体限制还是要测一下
+                    expr = "Or(" + expr + ",Id=" + str(id) + ")"
+                else:
+                    exprs.append(expr)
+                    expr = "Id=" + str(id)
+        exprs.append(expr)
+    elif mode == Mode.auid:
+        if(len(ids) >= 1):
+            expr = "composite(AA.AuId="+str(ids[0])+")"
+            for id in ids[1:]:
+                if expr <= 1700:
+                    expr = "Or(" + expr + ",Composite(AA.AuId=" + str(id) + "))"
+                else:
+                    exprs.append(expr)
+                    expr = "composite(AA.AuId="+str(id)+")"
+    return exprs
+
+def get_xids(paper):
+    xids = []
+    if paper.has_key("F"):
+        xids = [x["FId"] for x in paper["F"]]
+    if paper.has_key("C"):
+        xids.append(paper["C"]["CId"])
+    if paper.has_key("J"):
+        xids.append(paper["J"]["JId"])
+    return xids
 
 if __name__ == '__main__':
     try:
         print "-------------Tests below-------------------"
-        conn = httplib.HTTPSConnection('oxfordhk.azure-api.net')   #这个注意加在前面
+        conn = httplib.HTTPSConnection(hostname)   #这个注意加在前面
+        # time.sleep(10)
         Id_Info(conn, '2065555069')
         FId2Id(conn, '42525527')
         JId2Id(conn, '73400788')
         CId2Id(conn, '1121720292')
         AuId2Id(conn, '2278995570')
         print AuId2AFId(conn, '2098746329')
-        AFId2AuId(conn, '97018004')
+        # AFId2AuId(conn, '97018004')
+        AFId2AuId(conn, '5518804')
         conn.close()
     except BaseException, e:
         print(str(e))
