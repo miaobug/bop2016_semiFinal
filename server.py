@@ -14,7 +14,7 @@ def hello_world():
     param1 = parms[0]
     param2 = parms[1]
     id1, id2 = param1[1][0], param2[1][0]
-    result = query(str(id1), str(id2))
+    result = query(str(id2), str(id1))
 
     return Response(response=json.dumps(result), status=200, mimetype="application/json")
 
