@@ -8,20 +8,19 @@ from time import time
 # todo list:
 # 增加本地缓存机制/减少接口调用
 # 提高求交集的性能
-# 检查同步机制!!!!!(request_data
-# GET请求的长度限制检查
-# SSL链接建立优化
-# 环的检查 √
-# paper id 2292217923 的 RId 15万多...来个压力测试吧
+# 检查同步机制!!!!!(request_data                        √
+# GET请求的长度限制检查                                 现在感觉基本不会超了...
+# SSL链接建立优化                                        ×
+# 环的检查                                              √
+# paper id 2292217923 的 RId 15万多...来个压力测试吧      √
 # 优化RId查询
 # 优化并行结构
 # 找性能瓶颈
-# 多个query测试 √
-# 检查重复......
+# 多个query测试                                         √
+# 检查重复......                                    query1 √
+# 优化链接
 
 # 性能分析: python的dict采用哈希实现
-
-
 
 start_time = time()
 
@@ -29,12 +28,12 @@ start_time = time()
 def query(id1, id2):
     global start_time
     start_time = time()
-    conn = httplib.HTTPSConnection('oxfordhk.azure-api.net')
+    # conn = httplib.HTTPSConnection(hostname)
     expr1 = "Or(Id="+id1+",Composite(AA.AuId=" +id1+ "))"
     expr2 = "Or(Id="+id2+",Composite(AA.AuId=" +id2+ "))"
     #这两次请求好像比较慢一些
-    thread1 = Thread(target=send_request, args=[expr1], kwargs={})
-    thread2 = Thread(target=send_request, args=[expr2], kwargs={})
+    thread1 = Thread(target=send_request, args=[expr1])
+    thread2 = Thread(target=send_request, args=[expr2])
     thread1.start()
     thread2.start()
     thread1.join()
@@ -47,7 +46,6 @@ def query(id1, id2):
     len2 = len(data2)
     if(len1 <= 1):
         if(len2 <= 1):
-            # print "hi"
             return query1(data1, data2, id1, id2)
         else:
             return query2(data1, data2, id1, id2)
@@ -62,8 +60,9 @@ def query1(data1, data2, id1, id2): #Id-Id
     result = []
     RId1 =  data1[0]['RId']
     if(int(id2) in RId1):
-        result.append([int(id1), int(id2)])
+        result.append([int(id1), int(id2)]) #id-id
 
+    #请求id1引用的paper
     if(len(RId1) >= 1):
         expr_id1_to_id = "Id="+str(RId1[0])
         for id in RId1[1:]:
@@ -75,10 +74,12 @@ def query1(data1, data2, id1, id2): #Id-Id
     thread1 = Thread(target=send_request, args=[expr_id1_to_id])
     thread1.start()
 
+    #请求引用了id2的paper
     expr_id_to_id2 = "RId=" + id2
     thread2 = Thread(target=send_request, args=[expr_id_to_id2])
     thread2.start()
 
+    #请求id1的作者们的paper
     id1_to_AuId = [x['AuId'] for x in data1[0]["AA"]] #id1的作者列表
     if (len(id1_to_AuId) >= 2):
         expr_id1_to_AuId = "Or(Composite(AA.AuId=" + str(id1_to_AuId[0]) + "),Composite(AA.AuId=" + str(id1_to_AuId[1]) + "))"
@@ -91,60 +92,47 @@ def query1(data1, data2, id1, id2): #Id-Id
     thread3 = Thread(target=send_request, args=[expr_id1_to_AuId])
     thread3.start()
 
-    if(data1[0].has_key("F")):
-        xids1 = [x["FId"] for x in data1[0]["F"]]
-    else:
-        xids1 = []
-    if(data1[0].has_key("C")):
-        xids1.append(data1[0]["C"]["CId"])
-    if(data1[0].has_key("J")):
-        xids1.append(data1[0]["J"]["JId"])
-    if(data2[0].has_key("F")):
-        xids2 = [x["FId"] for x in data2[0]["F"]]
-    else:
-        xids2 = []
-    if (data2[0].has_key("C")):
-        xids2.append(data2[0]["C"]["CId"])
-    if (data2[0].has_key("J")):
-        xids2.append(data2[0]["J"]["JId"])
+    xids1 = get_xids(data1[0])
+    xids2 = get_xids(data2[0])
     intersection_xid = list(set(xids1) & set(xids2))
     for xid in intersection_xid:
         result.append([int(id1), xid, int(id2)]) # id-xid-id
 
     thread1.join()
     print "time id1_to_id: ", time() - start_time
+    auids_to_id2 = [x["AuId"] for x in data2[0]["AA"]]  # 写了id2的作者
     # 这个循环和下面的循环合并是不是更快?
     for paper in request_data[expr_id1_to_id]: # id1引用的paper
         #依赖于thread1
         if int(id2) in paper["RId"]:
             # print "haha"+id1+"-"+str(paper["Id"])+"-"+id2
             result.append([int(id1), paper["Id"], int(id2)]) #id-id-id
-        if (paper.has_key("F")):
+        if paper.has_key("F"):
             fids = [x["FId"] for x in paper["F"]]
             intersection_fid = list(set(fids) & set(xids2))
             for fid in intersection_fid:
                 result.append([int(id1), paper["Id"], fid, int(id2)])  # id-id-fid-id ..
-        if (paper.has_key("C")):
+        if paper.has_key("C"):
             if paper["C"]["CId"] in xids2:
-                result.append([int(id1), paper["Id"], paper["C"]["CId"], int(id2)])  # id-cid-id-id ..
-        if (paper.has_key("J")):
+                result.append([int(id1), paper["Id"], paper["C"]["CId"], int(id2)])  # id-id-cid-id ..
+        if paper.has_key("J"):
             if paper["J"]["JId"] in xids2:
-                result.append([int(id1), paper["Id"], paper["J"]["JId"], int(id2)])  # id-jid-id-id ..
+                result.append([int(id1), paper["Id"], paper["J"]["JId"], int(id2)])  # id-id-jid-id ..
+        auids = [x["AuId"] for x in paper["AA"]]  # 写了id1引用的文章的作者.
+        intersection_auid = list(set(auids) & set(auids_to_id2))
+        for auid in intersection_auid:
+            result.append([int(id1), paper["Id"], auid, int(id2)])  # id-id-auid-id
 
     thread2.join()
     print "time id to id2: ", time() - start_time
     ids_to_id2 = [x["Id"] for x in request_data[expr_id_to_id2]] #引用了id2的文章序号列表
-    auids_to_id2 = [x["AuId"] for x in data2[0]["AA"]] #写了id2的作者
+
     for paper in request_data[expr_id1_to_id]: #id1引用的文章
         # 这块依赖于thread2的结果
         intersection_id= list(set(ids_to_id2) & set(paper["RId"]))
-        for paper2 in intersection_id:
-            result.append([int(id1), paper["Id"], paper2, int(id2)]) #id-id-id-id
-        # 这块依赖于thread1的结果
-        auids = [x["AuId"] for x in paper["AA"]] #写了id1引用的文章的作者.
-        intersection_auid = list(set(auids) & set(auids_to_id2))
-        for auid in intersection_auid:
-            result.append([int(id1), paper["Id"], auid, int(id2)]) #id-id-auid-id
+        for id in intersection_id:
+            result.append([int(id1), paper["Id"], id, int(id2)]) #id-id-id-id
+
     #这块依赖于thread2的结果
     for paper in request_data[expr_id_to_id2]: #引用了id2的文章.
         if(paper.has_key("F")):
@@ -165,15 +153,9 @@ def query1(data1, data2, id1, id2): #Id-Id
         if paper["Id"] in ids_to_id2:
             temp_auids = [x["AuId"] for x in paper["AA"]]
             id1_to_AuIds = list(set(temp_auids) & set(id1_to_AuId))
-            for auid in id1_to_AuId:
+            for auid in id1_to_AuIds:
                 result.append([int(id1), auid, paper["Id"], int(id2)]) #id-auid-id-id
 
-    # #临时处理系统
-    # new_result = []
-    # for res_item in result:
-    #     if not(res_item in new_result):
-    #         new_result.append(res_item)
-    # result = new_result
     print "query1", len(result), result
     return result
 
@@ -185,7 +167,8 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     if int(id2) in auids:
         result.append([int(id1), int(id2)])  # id-auid
 
-    RId1 = data1[0]['RId']  # id1引用的文章
+    #请求id1引用的paper
+    RId1 = data1[0]['RId']
     if (len(RId1) >= 2):
         expr_id1_to_id = "Or(Id=" + str(RId1[0]) + ",Id=" + str(RId1[1]) + ")"
         for id in RId1[2:]:
@@ -197,6 +180,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     thread1 = Thread(target=send_request, args=[expr_id1_to_id])
     thread1.start()
 
+    #请求id1的作者写的paper
     if (len(auids) >= 2):
         expr_ids_to_AuId_of_id1 = "Or(Composite(AA.AuId=" + str(auids[0]) + "),Composite(AA.AuId=" + str(
             auids[1]) + "))"
@@ -209,7 +193,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     thread3 = Thread(target=send_request, args=[expr_ids_to_AuId_of_id1])
     thread3.start()
 
-    ids_to_AuId = [x["Id"] for x in data2[1:]]  # AuId写的paper
+    ids_to_AuId = [x["Id"] for x in data2[1:]]  # auid(id2)写的paper
 
     thread1.join()
     print "ids_to_auid: ", time() - start_time
@@ -231,23 +215,24 @@ def query2(data1, data2, id1, id2):  # Id-AuId
         if paper.has_key("F"):
             for fid in paper["F"]:
                 if fid["FId"] in xids1:
-                    result.append([int(id1), fid["FId"], paper["Id"], int(id2)])  # id-fid-id-auid 未测试
+                    result.append([int(id1), fid["FId"], paper["Id"], int(id2)])  # id-fid-id-auid
         if paper.has_key("C"):
             if paper["C"]["CId"] in xids1:
-                result.append([int(id1), paper["C"]["CId"], paper["Id"], int(id2)])  # id-cid-id-auid 未测试
+                result.append([int(id1), paper["C"]["CId"], paper["Id"], int(id2)])  # id-cid-id-auid
         if paper.has_key("J"):
             if paper["J"]["JId"] in xids1:
-                result.append([int(id1), paper["J"]["JId"], paper["Id"], int(id2)])  # id-jid-id-auid 未测试
+                result.append([int(id1), paper["J"]["JId"], paper["Id"], int(id2)])  # id-jid-id-auid
 
     thread3.join()
     print "time ids to auid of id1:", time() - start_time
+    #求auid所在的afid
     afids_to_AuId = []
     for paper in data2[1:]:
         for item in paper['AA']:
             if item.has_key('AfId') and str(item['AuId']) == id2:  # 注意有的作者没有机构的情况
                 AfId = item['AfId']
-                afids_to_AuId = afids_to_AuId if AfId in afids_to_AuId else afids_to_AuId + [
-                    AfId]
+                afids_to_AuId = afids_to_AuId if AfId in afids_to_AuId else afids_to_AuId + [AfId]
+
     # 我的天啊这个求交集的方式有点丑...
     for paper in request_data[expr_ids_to_AuId_of_id1]:
         for item in paper['AA']:
@@ -255,6 +240,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
                 res_item = [int(id1), item["AuId"], item["AfId"], int(id2)]
                 if not (res_item in result):
                     result.append(res_item)  # id-auid-afid-auid
+
     print "query2", len(result), result
     return result
 
@@ -267,11 +253,13 @@ def query3(data1, data2, id1, id2):# AuId-Id
     if int(id2) in ids_to_AuId:
         result.append([int(id1), int(id2)]) #auid-id
 
+    #请求引用了id2的paper
     expr_ids_to_id = "RId="+id2
     thread1 = Thread(target=send_request, args=[expr_ids_to_id])
     thread1.start()
 
-    auids = [x["AuId"] for x in data2[0]["AA"]] #id2的作者们
+    #请求id2的作者们写的paper
+    auids = [x["AuId"] for x in data2[0]["AA"]]
     if (len(auids) >= 2):
         expr_ids_to_AuId_of_id2 = "Or(Composite(AA.AuId=" + str(auids[0]) + "),Composite(AA.AuId=" + str(
             auids[1]) + "))"
@@ -293,8 +281,8 @@ def query3(data1, data2, id1, id2):# AuId-Id
         intersection_ids = list(set(paper["RId"]) & set(ids_to_id2))
         for id in intersection_ids:
             res_item = [int(id1), paper["Id"], id, int(id2)]
-            if not(res_item in result):
-                result.append(res_item) #auid-id-id-id
+            # if not(res_item in result):
+            result.append(res_item) #auid-id-id-id
     afids_to_AuId = []
     xids_to_id2 = get_xids(data2[0])
 
@@ -332,12 +320,14 @@ def query4(data1, data2, id1, id2):# AuId-AuId
     global start_time
     result = []
 
+    #求auid1所在的机构的afid
     afids_to_AuId1 = []
     for paper in data1[1:]:
         for item in paper['AA']:
             if item.has_key('AfId') and str(item['AuId']) == id1:
                 AfId = item['AfId']
                 afids_to_AuId1 = afids_to_AuId1 if AfId in afids_to_AuId1 else afids_to_AuId1 + [AfId]
+    #求auid2所在的机构的afid
     afids_to_AuId2 = []
     for paper in data2[1:]:
         for item in paper['AA']:
@@ -348,6 +338,7 @@ def query4(data1, data2, id1, id2):# AuId-AuId
     intersection_afids = list(set(afids_to_AuId1) & set(afids_to_AuId2))
     for afid in intersection_afids:
         result.append([int(id1), afid, int(id2)]) #auid-afid-auid
+
     ids_to_auid1 = [x["Id"] for x in data1[1:]]
     ids_to_auid2 = [x["Id"] for x in data2[1:]]
     for id in list(set(ids_to_auid1) & set(ids_to_auid2)):
@@ -358,7 +349,6 @@ def query4(data1, data2, id1, id2):# AuId-AuId
             res_item = [int(id1), paper["Id"], id, int(id2)]
             if not(res_item in result):
                 result.append(res_item) #auid-id-id-auid
-
 
     print "query3", len(result), result
     return result
