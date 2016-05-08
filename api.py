@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import httplib, urllib, base64, json
-from enum import Enum
+# from enum import Enum
 
 # 参考返回格式(无CID)
 # {
@@ -18,7 +18,6 @@ from enum import Enum
 
 request_data = {} # 多线程send_request的返回值
 hostname = 'oxfordhk.azure-api.net'
-Mode = Enum("Mode", ("default", "id", "auid"))
 
 def Id_Info(conn, Id):
     Id = 'Id=' + Id +'&'
@@ -138,7 +137,7 @@ def send_request(expr):
 
 def get_exprs(ids, mode):
     exprs = []
-    if mode == Mode.id:
+    if mode == "id":
         if(len(ids) >= 1):
             expr = "Id=" + str(ids[0])
             for id in ids[1:]:
@@ -148,7 +147,7 @@ def get_exprs(ids, mode):
                     exprs.append(expr)
                     expr = "Id=" + str(id)
         exprs.append(expr)
-    elif mode == Mode.auid:
+    elif mode == "auid":
         if(len(ids) >= 1):
             expr = "composite(AA.AuId="+str(ids[0])+")"
             for id in ids[1:]:

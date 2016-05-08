@@ -13,6 +13,7 @@ from time import time
 # SSL链接建立优化
 # 环的检查 √
 # paper id 2292217923 的 RId 15万多...来个压力测试吧
+# 优化RId查询
 # 优化并行结构
 # 找性能瓶颈
 # 多个query测试 √
@@ -56,7 +57,7 @@ def query(id1, id2):
         return query4(data1, data2, id1, id2)
 
 
-def query1(data1, data2, id1, id2): #id-id
+def query1(data1, data2, id1, id2): #Id-Id
     global start_time
     result = []
     RId1 =  data1[0]['RId']
@@ -277,7 +278,6 @@ def query3(data1, data2, id1, id2):# AuId-Id
     thread3 = Thread(target=send_request, args=[expr_ids_to_AuId_of_id2])
     thread3.start()
 
-
     thread1.join()
     ids_to_id2 = [x["Id"] for x in request_data[expr_ids_to_id]] #引用了id2的文章
     intersection_ids = list(set(ids_to_id2) & set(ids_to_AuId))
@@ -321,8 +321,8 @@ def query3(data1, data2, id1, id2):# AuId-Id
     print len(result), result
     return result
 
-# AuId-AuId
-def query4(data1, data2, id1, id2):
+
+def query4(data1, data2, id1, id2):# AuId-AuId
     global start_time
     result = []
 
@@ -379,8 +379,8 @@ if __name__ == "__main__":
     # query("2008785686", "2117094889")  # id-auid-afid-auid
 
     # query("2134482257", "1969892834") #auid-id
-    # query("2134482257", "2008785686") # auid-id-id
-    query("1912875929", "2292217923") #auid-id-id 炒鸡厉害的压力测试.. 花了300s...
+    query("2134482257", "2008785686") # auid-id-id
+    # query("1912875929", "2292217923") #auid-id-id 炒鸡厉害的压力测试.. 花了300s...
     # query("2134482257", "1996937460") # auid-id-id-id
     # query("2134482257", "1653619892")  # auid-afid-auid-id
     # query("2134482257", "2086248897")  # auid-id-auid-id
