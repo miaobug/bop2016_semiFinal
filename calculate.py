@@ -168,7 +168,13 @@ def query1(data1, data2, id1, id2): #Id-Id
             for auid in id1_to_AuId:
                 result.append([int(id1), auid, paper["Id"], int(id2)]) #id-auid-id-id
 
-    print len(result), result
+    # #临时处理系统
+    # new_result = []
+    # for res_item in result:
+    #     if not(res_item in new_result):
+    #         new_result.append(res_item)
+    # result = new_result
+    print "query1", len(result), result
     return result
 
 def query2(data1, data2, id1, id2):  # Id-AuId
@@ -249,7 +255,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
                 res_item = [int(id1), item["AuId"], item["AfId"], int(id2)]
                 if not (res_item in result):
                     result.append(res_item)  # id-auid-afid-auid
-    print len(result), result
+    print "query2", len(result), result
     return result
 
 
@@ -318,7 +324,7 @@ def query3(data1, data2, id1, id2):# AuId-Id
                     result.append(res_item)  # auid-afid-auid-id
 
 
-    print len(result), result
+    print "query3", len(result), result
     return result
 
 
@@ -354,7 +360,8 @@ def query4(data1, data2, id1, id2):# AuId-AuId
                 result.append(res_item) #auid-id-id-auid
 
 
-    print len(result), result
+    print "query3", len(result), result
+    return result
 
 
 if __name__ == "__main__":
@@ -391,4 +398,7 @@ if __name__ == "__main__":
     # query("2134482257", "2307611627")  # auid-id-auid
     # query("2134482257", "2288329424")  # auid-id-id-auid
 
-    query("189831743", "2147152072")
+    # query("189831743", "2147152072")
+    query("2126125555", "2060367530")
+
+

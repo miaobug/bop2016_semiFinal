@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import httplib, urllib, base64, json
+from threading import Semaphore
 # from enum import Enum
 
 # 参考返回格式(无CID)
@@ -18,6 +19,7 @@ import httplib, urllib, base64, json
 
 request_data = {} # 多线程send_request的返回值
 hostname = 'oxfordhk.azure-api.net'
+semaphore = Semaphore()
 
 def Id_Info(conn, Id):
     Id = 'Id=' + Id +'&'
@@ -121,6 +123,7 @@ def AFId2AuId(conn, AfId):
 
 def send_request(expr):
     global request_data
+    global semaphore
     if expr == "empty":
         request_data[expr] = []
         return
@@ -133,7 +136,9 @@ def send_request(expr):
     conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
     response = conn.getresponse()
     data = json.loads(response.read())['entities']
+    semaphore.acquire()
     request_data[expr] = data
+    semaphore.release()
 
 def get_exprs(ids, mode):
     exprs = []
