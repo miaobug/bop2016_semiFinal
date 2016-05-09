@@ -19,6 +19,7 @@ from time import time
 # 多个query测试                                         √
 # 检查重复......                                        √
 # 优化链接
+# list->set优化
 
 # 性能分析: python的dict采用哈希实现
 
@@ -94,13 +95,13 @@ def query1(data1, data2, id1, id2): #Id-Id
 
     xids1 = get_xids(data1[0])
     xids2 = get_xids(data2[0])
-    intersection_xid = list(set(xids1) & set(xids2))
+    intersection_xid = xids1 & xids2
     for xid in intersection_xid:
         result.append([int(id1), xid, int(id2)]) # id-xid-id
 
     thread1.join()
     print "time id1_to_id: ", time() - start_time
-    auids_to_id2 = [x["AuId"] for x in data2[0]["AA"]]  # 写了id2的作者
+    auids_to_id2 = set(x["AuId"] for x in data2[0]["AA"])  # 写了id2的作者
     # 这个循环和下面的循环合并是不是更快?
     for paper in request_data[expr_id1_to_id]: # id1引用的paper
         #依赖于thread1
@@ -108,8 +109,8 @@ def query1(data1, data2, id1, id2): #Id-Id
             # print "haha"+id1+"-"+str(paper["Id"])+"-"+id2
             result.append([int(id1), paper["Id"], int(id2)]) #id-id-id
         if paper.has_key("F"):
-            fids = [x["FId"] for x in paper["F"]]
-            intersection_fid = list(set(fids) & set(xids2))
+            fids = set(x["FId"] for x in paper["F"])
+            intersection_fid = set(fids) & xids2
             for fid in intersection_fid:
                 result.append([int(id1), paper["Id"], fid, int(id2)])  # id-id-fid-id ..
         if paper.has_key("C"):
@@ -118,26 +119,26 @@ def query1(data1, data2, id1, id2): #Id-Id
         if paper.has_key("J"):
             if paper["J"]["JId"] in xids2:
                 result.append([int(id1), paper["Id"], paper["J"]["JId"], int(id2)])  # id-id-jid-id ..
-        auids = [x["AuId"] for x in paper["AA"]]  # 写了id1引用的文章的作者.
-        intersection_auid = list(set(auids) & set(auids_to_id2))
+        auids = set(x["AuId"] for x in paper["AA"])  # 写了id1引用的文章的作者.
+        intersection_auid = auids & auids_to_id2
         for auid in intersection_auid:
             result.append([int(id1), paper["Id"], auid, int(id2)])  # id-id-auid-id
 
     thread2.join()
     print "time id to id2: ", time() - start_time
-    ids_to_id2 = [x["Id"] for x in request_data[expr_id_to_id2]] #引用了id2的文章序号列表
+    ids_to_id2 = set(x["Id"] for x in request_data[expr_id_to_id2]) #引用了id2的文章序号列表
 
     for paper in request_data[expr_id1_to_id]: #id1引用的文章
         # 这块依赖于thread2的结果
-        intersection_id= list(set(ids_to_id2) & set(paper["RId"]))
+        intersection_id= ids_to_id2 & set(paper["RId"])
         for id in intersection_id:
             result.append([int(id1), paper["Id"], id, int(id2)]) #id-id-id-id
 
     #这块依赖于thread2的结果
     for paper in request_data[expr_id_to_id2]: #引用了id2的文章.
         if(paper.has_key("F")):
-            fids = [x["FId"] for x in paper["F"]]
-            intersection_fid = list(set(fids) & set(xids1))
+            fids = set(x["FId"] for x in paper["F"])
+            intersection_fid = fids & xids1
             for fid in intersection_fid:
                 result.append([int(id1), fid, paper["Id"], int(id2)]) #id-fid-id-id ..
         if(paper.has_key("C")):
@@ -151,8 +152,8 @@ def query1(data1, data2, id1, id2): #Id-Id
     print "time id1 to AuId to id:", time() - start_time
     for paper in request_data[expr_id1_to_AuId]:
         if paper["Id"] in ids_to_id2:
-            temp_auids = [x["AuId"] for x in paper["AA"]]
-            id1_to_AuIds = list(set(temp_auids) & set(id1_to_AuId))
+            temp_auids = set(x["AuId"] for x in paper["AA"])
+            id1_to_AuIds = temp_auids & set(id1_to_AuId)
             for auid in id1_to_AuIds:
                 result.append([int(id1), auid, paper["Id"], int(id2)]) #id-auid-id-id
 
@@ -355,7 +356,7 @@ def query4(data1, data2, id1, id2):# AuId-AuId
 
 
 if __name__ == "__main__":
-    # query("2065555069", "2167884222") # id-id-id-id test case
+    query("2065555069", "2167884222") # id-id-id-id test case
     # query("2065555069", "2008785686") #id-id,id-id-id,id-id-id-id test case
     # query("2065555069", "2137247190") #id-id-auid-id
     # query("2065555069", "94203212")  # id-auid-id-id
@@ -364,7 +365,7 @@ if __name__ == "__main__":
     # query("2065555069", "2113671972")  # id-jid-id-id
     # query("2065555069", "2147264455")  # id-id-fid-id. 这组数据结果很差.thread2比较慢.引用第二篇文章的比较多,有4475篇
     # query("2065555069", "2034161127") #id-id-jid-id
-
+    #
     # query("2034161127", "56455408") #id-auid
     # query("2008785686", "197077518")  # id-id-auid
     # query("2008785686", "2178980517")  # id-id-id-auid
@@ -386,9 +387,9 @@ if __name__ == "__main__":
 
     # query("2134482257", "2243222307") #auid-afid-auid
     # query("2134482257", "2307611627")  # auid-id-auid
-    query("2134482257", "2288329424")  # auid-id-id-auid
+    # query("2134482257", "2288329424")  # auid-id-id-auid
 
     # query("189831743", "2147152072")
-    # query("2126125555", "2060367530")
+    # query("2126125555", "2060367530") #5616
 
 
