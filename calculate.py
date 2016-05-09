@@ -355,7 +355,7 @@ def query4(data1, data2, id1, id2):# AuId-AuId
             # if not(res_item in result):  #好像没有必要检查重复
             result.append(res_item) #auid-id-id-auid
 
-    print "query3", len(result), result
+    print "query4", len(result), result
     return result
 
 
