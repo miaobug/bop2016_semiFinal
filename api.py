@@ -176,13 +176,14 @@ def get_exprs(ids, mode):
     return exprs
 
 def get_xids(paper):
-    xids = []
+    xids = set()
     if paper.has_key("F"):
-        xids = [x["FId"] for x in paper["F"]]
+        xids = set(x["FId"] for x in paper["F"])
     if paper.has_key("C"):
-        xids.append(paper["C"]["CId"])
+        # xids.append(paper["C"]["CId"])
+        xids.add(paper["C"]["CId"])
     if paper.has_key("J"):
-        xids.append(paper["J"]["JId"])
+        xids.add(paper["J"]["JId"])
     return xids
 
 if __name__ == '__main__':
