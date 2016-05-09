@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 import httplib, urllib, base64, json
 from threading import Semaphore
+import logging
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(funcName)s %(message)s',
+                    # datefmt='%a, %d %b %Y %H:%M:%S',
+                    filename='bop2016.log',
+                    filemode='w')
+
 # from enum import Enum
 
 # 参考返回格式(无CID)
@@ -122,23 +130,27 @@ def AFId2AuId(conn, AfId):
     return AuIds
 
 def send_request(expr):
+    logging.debug("send_request starts, expr is "+expr)
     global request_data
     global semaphore
     if expr == "empty":
         request_data[expr] = []
         return
     conn = httplib.HTTPSConnection(hostname)
+    logging.debug('https connection established')
+
     count = '&count=100000000&'
     attributes = 'attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
     key = 'subscription-key=f7cc29509a8443c5b3a5e56b0e38b5a6'
     # print expr
-    print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
+    # print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
     conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
     response = conn.getresponse()
     data = json.loads(response.read())['entities']
     semaphore.acquire()
     request_data[expr] = data
     semaphore.release()
+    logging.debug('send_request ends, expr is '+expr)
 
 def get_exprs(ids, mode):
     exprs = []

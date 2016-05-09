@@ -3,6 +3,12 @@ import httplib
 from api import *
 from threading import Thread
 from time import time
+import logging
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] (%(funcName)s) %(message)s',
+                    filename='bop2016.log',
+                    filemode='w')
 # from Queue import Queue
 
 # todo list:
@@ -22,12 +28,13 @@ from time import time
 
 # 性能分析: python的dict采用哈希实现
 
-start_time = time()
+# start_time = time()
 
 #done
 def query(id1, id2):
-    global start_time
-    start_time = time()
+    logging.debug("query starts")
+    # global start_time
+    # start_time = time()
     # conn = httplib.HTTPSConnection(hostname)
     expr1 = "Or(Id="+id1+",Composite(AA.AuId=" +id1+ "))"
     expr2 = "Or(Id="+id2+",Composite(AA.AuId=" +id2+ "))"
@@ -38,12 +45,17 @@ def query(id1, id2):
     thread2.start()
     thread1.join()
     thread2.join()
-    print "time: ", time() - start_time
+    logging.debug("first 2 requests finished")
+    # print "time: ", time() - start_time
 
     data1 = request_data[expr1]
     data2 = request_data[expr2]
+
+
     len1 = len(data1)
     len2 = len(data2)
+
+    # 这里假定每个作者肯定写一篇以上的文章咯~ mr
     if(len1 <= 1):
         if(len2 <= 1):
             return query1(data1, data2, id1, id2)
@@ -56,11 +68,13 @@ def query(id1, id2):
 
 
 def query1(data1, data2, id1, id2): #Id-Id
-    global start_time
+    # global start_time
+    logging.debug("query1 starts")
     result = []
     RId1 =  data1[0]['RId']
     if(int(id2) in RId1):
         result.append([int(id1), int(id2)]) #id-id
+    # logging.debug("id-id path search ends")
 
     #请求id1引用的paper
     if(len(RId1) >= 1):
@@ -99,7 +113,9 @@ def query1(data1, data2, id1, id2): #Id-Id
         result.append([int(id1), xid, int(id2)]) # id-xid-id
 
     thread1.join()
-    print "time id1_to_id: ", time() - start_time
+    logging.debug('请求id1引用的paper 结束')
+
+    # print "time id1_to_id: ", time() - start_time
     auids_to_id2 = [x["AuId"] for x in data2[0]["AA"]]  # 写了id2的作者
     # 这个循环和下面的循环合并是不是更快?
     for paper in request_data[expr_id1_to_id]: # id1引用的paper
@@ -124,7 +140,8 @@ def query1(data1, data2, id1, id2): #Id-Id
             result.append([int(id1), paper["Id"], auid, int(id2)])  # id-id-auid-id
 
     thread2.join()
-    print "time id to id2: ", time() - start_time
+    logging.debug('请求引用了id2的paper ends')
+    # print "time id to id2: ", time() - start_time
     ids_to_id2 = [x["Id"] for x in request_data[expr_id_to_id2]] #引用了id2的文章序号列表
 
     for paper in request_data[expr_id1_to_id]: #id1引用的文章
@@ -148,7 +165,8 @@ def query1(data1, data2, id1, id2): #Id-Id
                 result.append([int(id1), paper["J"]["JId"], paper["Id"], int(id2)]) #id-jid-id-id ..
 
     thread3.join()
-    print "time id1 to AuId to id:", time() - start_time
+    logging.debug('请求id1的作者们的paper ends')
+    # print "time id1 to AuId to id:", time() - start_time
     for paper in request_data[expr_id1_to_AuId]:
         if paper["Id"] in ids_to_id2:
             temp_auids = [x["AuId"] for x in paper["AA"]]
@@ -156,11 +174,14 @@ def query1(data1, data2, id1, id2): #Id-Id
             for auid in id1_to_AuIds:
                 result.append([int(id1), auid, paper["Id"], int(id2)]) #id-auid-id-id
 
-    print "query1", len(result), result
+    # print "query1", len(result), result
+    logging.debug('query1 ends, result length is ' + str(len(result)) + ', result is ' + str(result))
     return result
 
+
 def query2(data1, data2, id1, id2):  # Id-AuId
-    global start_time
+    # global start_time
+    logging.debug('query2 starts')
     result = []
 
     auids = [x["AuId"] for x in data1[0]["AA"]]  # id1的作者们
@@ -196,7 +217,9 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     ids_to_AuId = [x["Id"] for x in data2[1:]]  # auid(id2)写的paper
 
     thread1.join()
-    print "ids_to_auid: ", time() - start_time
+    # print "ids_to_auid: ", time() - start_time
+    logging.debug('id1引用的paper信息 请求ends, expr= '+expr_id1_to_id)
+
     for paper in request_data[expr_id1_to_id]:  # id1引用的文章
         auids_rid_id1 = [x["AuId"] for x in paper["AA"]]
         if int(id2) in auids_rid_id1:
@@ -205,7 +228,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
         for id in intersection_id:
             result.append([int(id1), paper["Id"], id, int(id2)])  # id-id-id-auid
 
-    print "time ids to AuId to id:", time() - start_time
+    # print "time ids to AuId to id:", time() - start_time
     xids1 = get_xids(data1[0])
     for paper in data2[1:]:  # AuId写的文章
         auids_ids_AuId = [x["AuId"] for x in paper["AA"]]
@@ -224,8 +247,10 @@ def query2(data1, data2, id1, id2):  # Id-AuId
                 result.append([int(id1), paper["J"]["JId"], paper["Id"], int(id2)])  # id-jid-id-auid
 
     thread3.join()
-    print "time ids to auid of id1:", time() - start_time
-    #求auid所在的afid
+    # print "time ids to auid of id1:", time() - start_time
+    logging.debug('请求id1的作者写的paper ends, expr = '+ expr_ids_to_AuId_of_id1)
+
+    #求auid所在的afid, 下面这个变量名有迷惑性啊
     afids_to_AuId = []
     for paper in data2[1:]:
         for item in paper['AA']:
@@ -241,12 +266,14 @@ def query2(data1, data2, id1, id2):  # Id-AuId
                 if not (res_item in result):
                     result.append(res_item)  # id-auid-afid-auid
 
-    print "query2", len(result), result
+    # print "query2", len(result), result
+    logging.debug('query2 ends, result length is ' + str(len(result)) + ', result is ' + str(result))
     return result
 
 
+
 def query3(data1, data2, id1, id2):# AuId-Id
-    global start_time
+    # global start_time
     result = []
 
     ids_to_AuId = [x["Id"] for x in data1[1:]] # AuId的文章
@@ -273,6 +300,8 @@ def query3(data1, data2, id1, id2):# AuId-Id
     thread3.start()
 
     thread1.join()
+    logging.debug('请求引用了id2的paper ends, expr = '+expr_ids_to_id)
+
     ids_to_id2 = [x["Id"] for x in request_data[expr_ids_to_id]] #引用了id2的文章
     intersection_ids = list(set(ids_to_id2) & set(ids_to_AuId))
     for id in intersection_ids:
@@ -301,7 +330,8 @@ def query3(data1, data2, id1, id2):# AuId-Id
             result.append([int(id1), paper["Id"], xid, int(id2)])  # auid-id-xid-id
 
     thread3.join()
-    print "time ids to auid of id1:", time() - start_time
+    # print "time ids to auid of id1:", time() - start_time
+    logging.debug('请求id2的作者们写的paper ends, expr = '+ expr_ids_to_AuId_of_id2)
 
     # 我的天啊这个求交集的方式有点丑...
     for paper in request_data[expr_ids_to_AuId_of_id2]:#id2的作者写的其他文章
@@ -312,12 +342,17 @@ def query3(data1, data2, id1, id2):# AuId-Id
                     result.append(res_item)  # auid-afid-auid-id
 
 
-    print "query3", len(result), result
+    # print "query3", len(result), result
+    logging.debug('query3 ends, result length is ' + str(len(result)) + ', result is ' + str(result))
+
+
     return result
 
 
+
 def query4(data1, data2, id1, id2):# AuId-AuId
-    global start_time
+    # global start_time
+    logging.debug('query4 starts')
     result = []
 
     #求auid1所在的机构的afid
@@ -350,45 +385,47 @@ def query4(data1, data2, id1, id2):# AuId-AuId
             # if not(res_item in result):  #好像没有必要检查重复
             result.append(res_item) #auid-id-id-auid
 
-    print "query3", len(result), result
+    # print "query4", len(result), result
+    logging.debug('query4 ends, result length is ' + str(len(result)) + ', result is ' + str(result))
+
     return result
 
 
 if __name__ == "__main__":
-    # query("2065555069", "2167884222") # id-id-id-id test case
-    # query("2065555069", "2008785686") #id-id,id-id-id,id-id-id-id test case
-    # query("2065555069", "2137247190") #id-id-auid-id
-    # query("2065555069", "94203212")  # id-auid-id-id
-    # query("2065555069", "2138170171") #id-fid-id
-    # query("2065555069", "2158241055")  # id-fid-id-id
-    # query("2065555069", "2113671972")  # id-jid-id-id
-    # query("2065555069", "2147264455")  # id-id-fid-id. 这组数据结果很差.thread2比较慢.引用第二篇文章的比较多,有4475篇
-    # query("2065555069", "2034161127") #id-id-jid-id
+    query("2065555069", "2167884222") # id-id-id-id test case
+    query("2065555069", "2008785686") #id-id,id-id-id,id-id-id-id test case
+    query("2065555069", "2137247190") #id-id-auid-id
+    query("2065555069", "94203212")  # id-auid-id-id
+    query("2065555069", "2138170171") #id-fid-id
+    query("2065555069", "2158241055")  # id-fid-id-id
+    query("2065555069", "2113671972")  # id-jid-id-id
+    query("2065555069", "2147264455")  # id-id-fid-id. 这组数据结果很差.thread2比较慢.引用第二篇文章的比较多,有4475篇
+    query("2065555069", "2034161127") #id-id-jid-id
 
-    # query("2034161127", "56455408") #id-auid
-    # query("2008785686", "197077518")  # id-id-auid
-    # query("2008785686", "2178980517")  # id-id-id-auid
-    # query("2008785686", "2134482257")  # id-auid-id-auid
-    # query("2008785686", "671475949")  # id-fid-id-auid   (⊙o⊙)…长度太长爆掉了.可以拿来做后来的修正测试
-    # Thread(target=query, args=("2008785686", "2130310236")).start()
-    # Thread(target=query, args=("2008785686", "2117094889")).start()
-    # query("2008785686", "2130310236")  # id-jid-id-auid 爆掉了...
-    # query("2008785686", "2117094889")  # id-auid-afid-auid
+    query("2034161127", "56455408") #id-auid
+    query("2008785686", "197077518")  # id-id-auid
+    query("2008785686", "2178980517")  # id-id-id-auid
+    query("2008785686", "2134482257")  # id-auid-id-auid
+    query("2008785686", "671475949")  # id-fid-id-auid   (⊙o⊙)…长度太长爆掉了.可以拿来做后来的修正测试
+    Thread(target=query, args=("2008785686", "2130310236")).start()
+    Thread(target=query, args=("2008785686", "2117094889")).start()
+    query("2008785686", "2130310236")  # id-jid-id-auid 爆掉了...
+    query("2008785686", "2117094889")  # id-auid-afid-auid
 
-    # query("2134482257", "1969892834") #auid-id
-    # query("2134482257", "2008785686") # auid-id-id
-    # query("1912875929", "2292217923") #auid-id-id 炒鸡厉害的压力测试.. 花了300s...
-    # query("2134482257", "1996937460") # auid-id-id-id
-    # query("2134482257", "1653619892")  # auid-afid-auid-id
-    # query("2134482257", "2086248897")  # auid-id-auid-id
-    # query("2134482257", "2021221018")  # auid-id-xid-id
-    # Thread(target=query, args=("2134482257", "2021221018")).start()
+    query("2134482257", "1969892834") #auid-id
+    query("2134482257", "2008785686") # auid-id-id
+    query("1912875929", "2292217923") #auid-id-id 炒鸡厉害的压力测试.. 花了300s...
+    query("2134482257", "1996937460") # auid-id-id-id
+    query("2134482257", "1653619892")  # auid-afid-auid-id
+    query("2134482257", "2086248897")  # auid-id-auid-id
+    query("2134482257", "2021221018")  # auid-id-xid-id
+    Thread(target=query, args=("2134482257", "2021221018")).start()
 
-    # query("2134482257", "2243222307") #auid-afid-auid
-    # query("2134482257", "2307611627")  # auid-id-auid
+    query("2134482257", "2243222307") #auid-afid-auid
+    query("2134482257", "2307611627")  # auid-id-auid
     query("2134482257", "2288329424")  # auid-id-id-auid
 
-    # query("189831743", "2147152072")
-    # query("2126125555", "2060367530")
+    query("189831743", "2147152072")
+    query("2126125555", "2060367530")
 
 
