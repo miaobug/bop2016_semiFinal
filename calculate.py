@@ -17,7 +17,7 @@ from time import time
 # 优化并行结构
 # 找性能瓶颈
 # 多个query测试                                         √
-# 检查重复......                                    query1 √
+# 检查重复......                                        √
 # 优化链接
 
 # 性能分析: python的dict采用哈希实现
@@ -288,7 +288,7 @@ def query3(data1, data2, id1, id2):# AuId-Id
 
     for paper in data1[1:]:  # auid写的文章
         for item in paper['AA']:
-            if item.has_key('AfId') and str(item['AuId']) == id1:  # 求auid所属的afid
+            if item.has_key('AfId') and str(item['AuId']) == id1:  # 求auid所属的afid,在thread3.join()以后用到
                 AfId = item['AfId']
                 afids_to_AuId = afids_to_AuId if AfId in afids_to_AuId else afids_to_AuId + [
                     AfId]
@@ -347,8 +347,8 @@ def query4(data1, data2, id1, id2):# AuId-AuId
         intersection_ids = list(set(paper["RId"]) & set(ids_to_auid2))
         for id in intersection_ids:
             res_item = [int(id1), paper["Id"], id, int(id2)]
-            if not(res_item in result):
-                result.append(res_item) #auid-id-id-auid
+            # if not(res_item in result):  #好像没有必要检查重复
+            result.append(res_item) #auid-id-id-auid
 
     print "query3", len(result), result
     return result
@@ -386,9 +386,9 @@ if __name__ == "__main__":
 
     # query("2134482257", "2243222307") #auid-afid-auid
     # query("2134482257", "2307611627")  # auid-id-auid
-    # query("2134482257", "2288329424")  # auid-id-id-auid
+    query("2134482257", "2288329424")  # auid-id-id-auid
 
     # query("189831743", "2147152072")
-    query("2126125555", "2060367530")
+    # query("2126125555", "2060367530")
 
 
