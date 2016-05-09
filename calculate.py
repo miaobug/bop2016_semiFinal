@@ -194,23 +194,23 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     thread3 = Thread(target=send_request, args=[expr_ids_to_AuId_of_id1])
     thread3.start()
 
-    ids_to_AuId = [x["Id"] for x in data2[1:]]  # auid(id2)写的paper
+    ids_to_AuId = set(x["Id"] for x in data2[1:])  # auid(id2)写的paper
 
     thread1.join()
     print "ids_to_auid: ", time() - start_time
     for paper in request_data[expr_id1_to_id]:  # id1引用的文章
-        auids_rid_id1 = [x["AuId"] for x in paper["AA"]]
+        auids_rid_id1 = set(x["AuId"] for x in paper["AA"])
         if int(id2) in auids_rid_id1:
             result.append([int(id1), paper["Id"], int(id2)])  # id-id-auid
-        intersection_id = list(set(paper["RId"]) & set(ids_to_AuId))
+        intersection_id = set(paper["RId"]) & ids_to_AuId
         for id in intersection_id:
             result.append([int(id1), paper["Id"], id, int(id2)])  # id-id-id-auid
 
     print "time ids to AuId to id:", time() - start_time
     xids1 = get_xids(data1[0])
     for paper in data2[1:]:  # AuId写的文章
-        auids_ids_AuId = [x["AuId"] for x in paper["AA"]]
-        intersection_auid = list(set(auids_ids_AuId) & set(auids))
+        auids_ids_AuId = set(x["AuId"] for x in paper["AA"])
+        intersection_auid = auids_ids_AuId & set(auids)
         for auid in intersection_auid:
             result.append([int(id1), auid, paper["Id"], int(id2)])  # id-auid-id-auid
         if paper.has_key("F"):
@@ -227,17 +227,19 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     thread3.join()
     print "time ids to auid of id1:", time() - start_time
     #求auid所在的afid
-    afids_to_AuId = []
+    afids_to_AuId = set([])
     for paper in data2[1:]:
-        for item in paper['AA']:
-            if item.has_key('AfId') and str(item['AuId']) == id2:  # 注意有的作者没有机构的情况
-                AfId = item['AfId']
-                afids_to_AuId = afids_to_AuId if AfId in afids_to_AuId else afids_to_AuId + [AfId]
+        if paper.has_key("AA"):
+            for item in paper['AA']:
+                if item.has_key('AfId') and str(item['AuId']) == id2:  # 注意有的作者没有机构的情况
+                    AfId = item['AfId']
+                    if not (AfId in afids_to_AuId):
+                        afids_to_AuId.add(AfId)
 
     # 我的天啊这个求交集的方式有点丑...
     for paper in request_data[expr_ids_to_AuId_of_id1]:
         for item in paper['AA']:
-            if item.has_key('AfId') and item['AuId'] in auids and item["AfId"] in afids_to_AuId:  # 注意有的作者没有机构的情况
+            if item.has_key('AfId') and item["AfId"] in afids_to_AuId and item['AuId'] in auids:  # 注意有的作者没有机构的情况
                 res_item = [int(id1), item["AuId"], item["AfId"], int(id2)]
                 if not (res_item in result):
                     result.append(res_item)  # id-auid-afid-auid
@@ -250,7 +252,7 @@ def query3(data1, data2, id1, id2):# AuId-Id
     global start_time
     result = []
 
-    ids_to_AuId = [x["Id"] for x in data1[1:]] # AuId的文章
+    ids_to_AuId = set(x["Id"] for x in data1[1:]) # AuId的文章
     if int(id2) in ids_to_AuId:
         result.append([int(id1), int(id2)]) #auid-id
 
@@ -274,30 +276,30 @@ def query3(data1, data2, id1, id2):# AuId-Id
     thread3.start()
 
     thread1.join()
-    ids_to_id2 = [x["Id"] for x in request_data[expr_ids_to_id]] #引用了id2的文章
-    intersection_ids = list(set(ids_to_id2) & set(ids_to_AuId))
+    ids_to_id2 = set(x["Id"] for x in request_data[expr_ids_to_id]) #引用了id2的文章
+    intersection_ids = ids_to_id2 & ids_to_AuId
     for id in intersection_ids:
         result.append([int(id1), id, int(id2)]) #auid-id-id
     for paper in data1[1:]: #AuId的文章
-        intersection_ids = list(set(paper["RId"]) & set(ids_to_id2))
+        intersection_ids = set(paper["RId"]) & ids_to_id2
         for id in intersection_ids:
             res_item = [int(id1), paper["Id"], id, int(id2)]
             # if not(res_item in result):
             result.append(res_item) #auid-id-id-id
-    afids_to_AuId = []
+    afids_to_AuId = set()
     xids_to_id2 = get_xids(data2[0])
 
     for paper in data1[1:]:  # auid写的文章
         for item in paper['AA']:
             if item.has_key('AfId') and str(item['AuId']) == id1:  # 求auid所属的afid,在thread3.join()以后用到
                 AfId = item['AfId']
-                afids_to_AuId = afids_to_AuId if AfId in afids_to_AuId else afids_to_AuId + [
-                    AfId]
+                if not (AfId in afids_to_AuId):
+                    afids_to_AuId.add(AfId)
             if item["AuId"] in auids:  # 求auid-id-auid-id
                 res_item = [int(id1), paper["Id"], item["AuId"], int(id2)]  # auid-id-auid-id
                 result.append(res_item)
         xids_to_id_of_auid = get_xids(paper)
-        intersection_xids = list(set(xids_to_id2) & set(xids_to_id_of_auid))
+        intersection_xids = xids_to_id2 & xids_to_id_of_auid
         for xid in intersection_xids:
             result.append([int(id1), paper["Id"], xid, int(id2)])  # auid-id-xid-id
 
@@ -322,30 +324,32 @@ def query4(data1, data2, id1, id2):# AuId-AuId
     result = []
 
     #求auid1所在的机构的afid
-    afids_to_AuId1 = []
+    afids_to_AuId1 = set()
     for paper in data1[1:]:
         for item in paper['AA']:
             if item.has_key('AfId') and str(item['AuId']) == id1:
                 AfId = item['AfId']
-                afids_to_AuId1 = afids_to_AuId1 if AfId in afids_to_AuId1 else afids_to_AuId1 + [AfId]
+                if not AfId in afids_to_AuId1:
+                    afids_to_AuId1.add(AfId)
     #求auid2所在的机构的afid
-    afids_to_AuId2 = []
+    afids_to_AuId2 = set()
     for paper in data2[1:]:
         for item in paper['AA']:
             if item.has_key('AfId') and str(item['AuId']) == id2:
                 AfId = item['AfId']
-                afids_to_AuId2 = afids_to_AuId2 if AfId in afids_to_AuId2 else afids_to_AuId2 + [
-                    AfId]
-    intersection_afids = list(set(afids_to_AuId1) & set(afids_to_AuId2))
+                if not AfId in afids_to_AuId2:
+                    afids_to_AuId2.add(AfId)
+
+    intersection_afids = afids_to_AuId1 & afids_to_AuId2
     for afid in intersection_afids:
         result.append([int(id1), afid, int(id2)]) #auid-afid-auid
 
-    ids_to_auid1 = [x["Id"] for x in data1[1:]]
-    ids_to_auid2 = [x["Id"] for x in data2[1:]]
-    for id in list(set(ids_to_auid1) & set(ids_to_auid2)):
+    ids_to_auid1 = set(x["Id"] for x in data1[1:])
+    ids_to_auid2 = set(x["Id"] for x in data2[1:])
+    for id in ids_to_auid1 & ids_to_auid2:
         result.append([int(id1), id, int(id2)])
     for paper in data1[1:]: #auid1写的文章
-        intersection_ids = list(set(paper["RId"]) & set(ids_to_auid2))
+        intersection_ids = set(paper["RId"]) & ids_to_auid2
         for id in intersection_ids:
             res_item = [int(id1), paper["Id"], id, int(id2)]
             # if not(res_item in result):  #好像没有必要检查重复
@@ -356,7 +360,7 @@ def query4(data1, data2, id1, id2):# AuId-AuId
 
 
 if __name__ == "__main__":
-    query("2065555069", "2167884222") # id-id-id-id test case
+    # query("2065555069", "2167884222") # id-id-id-id test case
     # query("2065555069", "2008785686") #id-id,id-id-id,id-id-id-id test case
     # query("2065555069", "2137247190") #id-id-auid-id
     # query("2065555069", "94203212")  # id-auid-id-id
@@ -391,5 +395,14 @@ if __name__ == "__main__":
 
     # query("189831743", "2147152072")
     # query("2126125555", "2060367530") #5616
+
+    # 官方测试数据:
+    # 189831743
+    # 2147152072
+    # 2310280492
+    # 2332023333
+    # 2180737804
+    # 2251253715
+    # 14, 18, 1
 
 
