@@ -19,7 +19,7 @@ from time import time
 # 多个query测试                                         √
 # 检查重复......                                        √
 # 优化链接
-# list->set优化
+# list->set优化                                        √
 
 # 性能分析: python的dict采用哈希实现
 
@@ -309,11 +309,10 @@ def query3(data1, data2, id1, id2):# AuId-Id
     # 我的天啊这个求交集的方式有点丑...
     for paper in request_data[expr_ids_to_AuId_of_id2]:#id2的作者写的其他文章
         for item in paper['AA']:
-            if item.has_key('AfId') and item['AuId'] in auids and item["AfId"] in afids_to_AuId:  # 注意有的作者没有机构的情况
+            if item.has_key('AfId') and item["AfId"] in afids_to_AuId and item['AuId'] in auids :  # 注意有的作者没有机构的情况
                 res_item = [int(id1), item["AfId"], item["AuId"], int(id2)]
                 if not (res_item in result):
                     result.append(res_item)  # auid-afid-auid-id
-
 
     print "query3", len(result), result
     return result
@@ -360,7 +359,7 @@ def query4(data1, data2, id1, id2):# AuId-AuId
 
 
 if __name__ == "__main__":
-    # query("2065555069", "2167884222") # id-id-id-id test case
+    query("2065555069", "2167884222") # id-id-id-id test case
     # query("2065555069", "2008785686") #id-id,id-id-id,id-id-id-id test case
     # query("2065555069", "2137247190") #id-id-auid-id
     # query("2065555069", "94203212")  # id-auid-id-id
