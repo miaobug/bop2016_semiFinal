@@ -4,7 +4,7 @@ from api import *
 from threading import Thread
 from time import time
 import logging
-
+from profile import *
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] (%(funcName)s) %(message)s',
                     filename='bop2016.log',
@@ -32,6 +32,7 @@ logging.basicConfig(level=logging.DEBUG,
 # start_time = time()
 
 #done
+@hotshotit
 def query(id1, id2):
     logging.debug("query starts")
     # global start_time
@@ -67,7 +68,7 @@ def query(id1, id2):
     else:
         return query4(data1, data2, id1, id2)
 
-
+@hotshotit
 def query1(data1, data2, id1, id2): #Id-Id
     # global start_time
     logging.debug("query1 starts")
@@ -184,7 +185,7 @@ def query1(data1, data2, id1, id2): #Id-Id
     logging.debug('query1 ends, result length is ' + str(len(result)) + ', result is ' + str(result))
     return result
 
-
+@hotshotit
 def query2(data1, data2, id1, id2):  # Id-AuId
     # global start_time
     logging.debug('query2 starts')
@@ -280,7 +281,7 @@ def query2(data1, data2, id1, id2):  # Id-AuId
     return result
 
 
-
+@hotshotit
 def query3(data1, data2, id1, id2):# AuId-Id
     # global start_time
     result = []
@@ -360,7 +361,7 @@ def query3(data1, data2, id1, id2):# AuId-Id
     return result
 
 
-
+@hotshotit
 def query4(data1, data2, id1, id2):# AuId-AuId
     # global start_time
     logging.debug('query4 starts')

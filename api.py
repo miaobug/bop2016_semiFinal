@@ -2,6 +2,7 @@
 import httplib, urllib, base64, json
 from threading import Semaphore
 import logging
+from profile import *
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(funcName)s %(message)s',
@@ -128,6 +129,7 @@ def AFId2AuId(conn, AfId):
                 AuIds = AuIds if AuId in AuIds else AuIds + [AuId]
     # print len(AuIds)
     return AuIds
+
 
 def send_request(expr):
     logging.debug("send_request starts, expr is "+expr)
