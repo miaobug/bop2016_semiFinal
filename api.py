@@ -2,9 +2,12 @@
 import httplib, urllib, base64, json
 from threading import Semaphore, Thread
 import logging
-from urllib3 import PoolManager
+# from urllib3 import PoolManager
+# from test_get import *
+from urllib3 import HTTPConnectionPool
+pool = HTTPConnectionPool('oxfordhk.azure-api.net', maxsize=100)
 
-pm = PoolManager(100)
+# pm = PoolManager(100)
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(filename)s[line:%(lineno)d] %(funcName)s %(message)s',
@@ -166,15 +169,18 @@ def send_request(expr):
     # conn = httplib.HTTPSConnection(hostname)
     logging.debug('https connection established')
 
-    count = '&count=100000000&'
-    attributes = 'attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
+    count = '&count=100000000'
+    attributes = '&attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
     key = 'subscription-key=f7cc29509a8443c5b3a5e56b0e38b5a6'
     # print expr
     # print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
     # conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
     # response = conn.getresponse()
-    r = pm.request('GET', hostname + "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    # r = pm.request('GET', hostname + "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
     # data = json.loads(response.read())['entities']
+    # rdata = httppool("/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    r = pool.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    # print data
     data = json.loads(r.data)['entities']
     semaphore.acquire()
     request_data[expr] = data
