@@ -1,6 +1,17 @@
 # -*- coding: utf-8 -*-
 import httplib, urllib, base64, json
-from threading import Semaphore
+from threading import Semaphore, Thread
+import logging
+from urllib3 import PoolManager
+
+pm = PoolManager(100)
+
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s %(filename)s[line:%(lineno)d] %(funcName)s %(message)s',
+                    # datefmt='%a, %d %b %Y %H:%M:%S',
+                    filename='bop2016.log',
+                    filemode='w')
+
 # from enum import Enum
 
 # 参考返回格式(无CID)
@@ -121,46 +132,79 @@ def AFId2AuId(conn, AfId):
     # print len(AuIds)
     return AuIds
 
+# def send_request(expr):
+#     logging.debug("send_request starts, expr is "+expr)
+#     global request_data
+#     global semaphore
+#     if expr == "empty":
+#         request_data[expr] = []
+#         return
+#     conn = httplib.HTTPSConnection(hostname)
+#     logging.debug('https connection established')
+#
+#     count = '&count=100000000&'
+#     attributes = 'attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
+#     key = 'subscription-key=f7cc29509a8443c5b3a5e56b0e38b5a6'
+#     # print expr
+#     # print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
+#     conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+#     response = conn.getresponse()
+#     data = json.loads(response.read())['entities']
+#     semaphore.acquire()
+#     request_data[expr] = data
+#     semaphore.release()
+#     logging.debug('send_request ends, expr is '+expr)
+
+
 def send_request(expr):
+    logging.debug("send_request starts, expr is "+expr)
     global request_data
     global semaphore
     if expr == "empty":
         request_data[expr] = []
         return
-    conn = httplib.HTTPSConnection(hostname)
+    # conn = httplib.HTTPSConnection(hostname)
+    logging.debug('https connection established')
+
     count = '&count=100000000&'
     attributes = 'attributes=RId,C.CId,J.JId,F.FId,Id,CC,AA.AuId,AA.AfId&'
     key = 'subscription-key=f7cc29509a8443c5b3a5e56b0e38b5a6'
     # print expr
-    print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
-    conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
-    response = conn.getresponse()
-    data = json.loads(response.read())['entities']
+    # print "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key
+    # conn.request("GET", "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    # response = conn.getresponse()
+    r = pm.request('GET', hostname + "/academic/v1.0/evaluate?expr=" + expr + count + attributes + key)
+    # data = json.loads(response.read())['entities']
+    data = json.loads(r.data)['entities']
     semaphore.acquire()
     request_data[expr] = data
     semaphore.release()
+    logging.debug('send_request ends, expr is '+expr)
 
-def get_exprs(ids, mode):
+def get_exprs(ids, mode="auid"):
     exprs = []
+    expr = "empty"
     if mode == "id":
         if(len(ids) >= 1):
             expr = "Id=" + str(ids[0])
             for id in ids[1:]:
-                if expr <= 1700: # 长度具体限制还是要测一下
+                if len(expr) <= 1700: # 长度具体限制还是要测一下
                     expr = "Or(" + expr + ",Id=" + str(id) + ")"
                 else:
                     exprs.append(expr)
+                    # print "exprs.append(expr)", len(expr), expr
                     expr = "Id=" + str(id)
         exprs.append(expr)
     elif mode == "auid":
         if(len(ids) >= 1):
             expr = "composite(AA.AuId="+str(ids[0])+")"
             for id in ids[1:]:
-                if expr <= 1700:
+                if len(expr) <= 1700:
                     expr = "Or(" + expr + ",Composite(AA.AuId=" + str(id) + "))"
                 else:
                     exprs.append(expr)
                     expr = "composite(AA.AuId="+str(id)+")"
+        exprs.append(expr)
     return exprs
 
 def get_xids(paper):
@@ -173,6 +217,24 @@ def get_xids(paper):
     if paper.has_key("J"):
         xids.add(paper["J"]["JId"])
     return xids
+
+def get_info(exprs, key):
+    threads = [Thread(target=send_request, args=[expr]) for expr in exprs]
+    for thread in threads:
+        thread.start()
+    data = []
+    i = 0
+    for thread in threads:
+        thread.join()
+        semaphore.acquire()
+        data +=request_data[exprs[i]]
+        # print "expr[i]: ", exprs[i]
+        semaphore.release()
+        i += 1
+    semaphore.acquire()
+    request_data[key] = data
+    semaphore.release()
+
 
 if __name__ == '__main__':
     try:
